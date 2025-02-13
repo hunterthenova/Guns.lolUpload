@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guns.lol Image Uploader</title>
+  <link rel="icon" href="https://www.google.com/s2/favicons?sz=64&domain=guns.lol" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1c1c1c;
+      color: #e0e0e0;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+    }
+    
+    #upload-container {
+      background-color: #2c2c2c;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      width: 90%;
+      max-width: 400px;
+    }
+
+    button {
+      background-color: #74477e;
+      color: #ffffff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+    }
+
+    button:hover {
+      background-color: #5c3562;
+    }
+
+    a {
+      color: #74477e;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    input {
+      padding: 8px;
+      margin: 10px 0;
+      font-size: 16px;
+      border-radius: 4px;
+      border: none;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    #status {
+      margin-top: 20px;
+      text-align: left;
+      max-width: 350px;
+      word-wrap: break-word;
+    }
+
+    #footer {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div id="upload-container">
+    <h2>Guns.lol Image Uploader</h2>
+    <button id="getAccessBtn" onclick="window.open('https://cors-anywhere.herokuapp.com/corsdemo', '_blank')">
+      <b>Get Access</b>
+    </button>
+    <input type="text" id="uploadKey" placeholder="Enter Upload Key" />
+    <button id="fileUploadBtn">Upload from File</button>
+    <input type="file" id="file-input" accept="image/*" multiple />
+    <button id="clipboardUploadBtn">Upload from Clipboard</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="footer">
+    Open Source <a href="https://github.com/hunterthenova/glolimg" target="_blank">GitHub</a> ● 
+    <a href="https://guns.lol/imagehost/gallery" target="_blank"><b>Gallery</b></a> ●
+    Website Creator <a href="https://hunter.huntersdesigns.com" target="_blank">HunterTheNova</a> ●
+    Find Your Key <a href="https://guns.lol/imagehost" target="_blank">Image Host Settings</a>
+  </div>
+
+  <script>
+    const PROXY_URL = "https://cors-anywhere.herokuapp.com/";
+    const API_URL = "https://guns.lol/api/upload";
+
+    function setCookie(cname, cvalue, exdays) {
+      const d = new Date();
+      d.setTime(d.getTime() + exdays * 24 * 60 * 60 * 1000);
+      document.cookie = cname + "=" + cvalue + ";expires=" + d.toUTCString() + ";path=/";
+    }
+
+    function getCookie(cname) {
+      const name = cname + "=";
+      const ca = document.cookie.split(";");
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i].trim();
+        if (c.indexOf(name) == 0) return c.substring(name.length, c.length);
+      }
+      return "";
+    }
+
+    window.addEventListener("load", () => {
+      const savedKey = getCookie("uploadKey");
+      if (savedKey) {
+        document.getElementById("uploadKey").value = savedKey;
+      }
+    });
+
+    document.getElementById("uploadKey").addEventListener("blur", () => {
+      const key = document.getElementById("uploadKey").value.trim();
+      if (key) {
+        setCookie("uploadKey", key, 30);
+      }
+    });
+
+    async function uploadFile(file, fileName) {
+      const key = document.getElementById("uploadKey").value.trim();
+      if (!key) {
+        alert("Upload key is required.");
+        return;
+      }
+
+      const form = new FormData();
+      form.append("file", file, fileName);
+      form.append("key", key);
+
+      document.getElementById("status").innerHTML += `<p>Uploading ${fileName}...</p>`;
+
+      try {
+        const response = await fetch(PROXY_URL + API_URL, {
+          method: "POST",
+          body: form,
+        });
+
+        const data = await response.json();
+
+        if (data.message === "Success" && data.link) {
+          await navigator.clipboard.writeText(data.link);
+          document.getElementById("status").innerHTML += `<p>${fileName}: <a href="${data.link}" target="_blank">${data.link}</a> (Copied to clipboard)</p>`;
+        } else {
+          document.getElementById("status").innerHTML += `<p>${fileName}: Error: ${data.error || "Unknown error"}</p>`;
+        }
+      } catch (error) {
+        document.getElementById("status").innerHTML += `<p>${fileName}: Upload failed.</p>`;
+        console.error(error);
+      }
+    }
+
+    document.getElementById("fileUploadBtn").addEventListener("click", () => {
+      document.getElementById("file-input").click();
+    });
+
+    document.getElementById("file-input").addEventListener("change", function () {
+      const files = this.files;
+      if (files.length > 0) {
+        Array.from(files).forEach(file => uploadFile(file, file.name));
+      }
+    });
+
+    document.getElementById("clipboardUploadBtn").addEventListener("click", async () => {
+      let items;
+      try {
+        items = await navigator.clipboard.read();
+      } catch {
+        return alert("Could not access clipboard. Please allow clipboard permissions.");
+      }
+
+      for (let item of items) {
+        const fileType = item.types[0];
+        if (fileType.startsWith("image/")) {
+          const blob = await item.getType(fileType);
+          const ext = fileType.split("/")[1];
+          uploadFile(blob, `clipboard-image.${ext}`);
+        } else {
+          alert("No valid image found in clipboard.");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
